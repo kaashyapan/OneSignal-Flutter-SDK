@@ -6,6 +6,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 
+import android.os.Handler;
 import com.onesignal.OSEmailSubscriptionObserver;
 import com.onesignal.OSEmailSubscriptionStateChanges;
 import com.onesignal.OSNotification;
@@ -39,6 +40,8 @@ public class OneSignalPlugin implements MethodCallHandler, NotificationReceivedH
   private boolean waitingForUserPrivacyConsent = false;
   private OSNotificationOpenResult coldStartNotificationResult;
   private boolean setNotificationOpenedHandler = false;
+  //mainThread handler
+  final private Handler mainHandler = new Handler();
 
   public static void registerWith(Registrar registrar) {
     OneSignal.sdkType = "flutter";
@@ -282,25 +285,40 @@ public class OneSignalPlugin implements MethodCallHandler, NotificationReceivedH
   }
 
   @Override
-  public void notificationReceived(OSNotification notification) {
-    try {
-      this.channel.invokeMethod("OneSignal#handleReceivedNotification", OneSignalSerializer.convertNotificationToMap(notification));
-    } catch (JSONException exception) {
-      Log.e("onesignal", "Encountered an error attempting to convert OSNotification object to hash map: " + exception.getMessage() + "\n" + exception.getStackTrace());
-    }
+  public void notificationReceived(final OSNotification notification) {
+        
+    final MethodChannel channel = this.channel;
+
+    mainHandler.post(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          channel.invokeMethod("OneSignal#handleReceivedNotification", OneSignalSerializer.convertNotificationToMap(notification));
+        } catch (JSONException exception) {
+          Log.e("onesignal", "Encountered an error attempting to convert OSNotification object to hash map: " + exception.getMessage() + "\n" + exception.getStackTrace());
+        }
+      }
+    });
   }
 
   @Override
-  public void notificationOpened(OSNotificationOpenResult result) {
+  public void notificationOpened(final OSNotificationOpenResult result) {
     if (!this.setNotificationOpenedHandler) {
       this.coldStartNotificationResult = result;
       return;
     }
     
-    try {
-      this.channel.invokeMethod("OneSignal#handleOpenedNotification", OneSignalSerializer.convertNotificationOpenResultToMap(result));
-    } catch (JSONException exception) {
-      Log.e("onesignal", "Encountered an error attempting to convert OSNotificationOpenResult object to hash map: " + exception.getMessage() + "\n" + exception.getStackTrace());
-    }
+    final MethodChannel channel = this.channel;
+
+    mainHandler.post(new Runnable() {
+      @Override
+      public void run() {
+        try {
+          channel.invokeMethod("OneSignal#handleOpenedNotification", OneSignalSerializer.convertNotificationOpenResultToMap(result));
+        } catch (JSONException exception) {
+          Log.e("onesignal", "Encountered an error attempting to convert OSNotificationOpenResult object to hash map: " + exception.getMessage() + "\n" + exception.getStackTrace());
+        }
+      }
+    });
   }
 }
